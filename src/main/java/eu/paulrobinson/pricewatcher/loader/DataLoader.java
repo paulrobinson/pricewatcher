@@ -1,6 +1,7 @@
 package eu.paulrobinson.pricewatcher.loader;
 
 import eu.paulrobinson.pricewatcher.entities.Item;
+import eu.paulrobinson.pricewatcher.entities.Price;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import javax.inject.Inject;
@@ -27,27 +28,38 @@ public class DataLoader {
 
         int updateCount = 0;
         int createCount = 0;
+        int sameCount = 0;
 
         for (Boxes.Response.Data.Box box : boxes) {
 
             Item existingItem = Item.findByExternalId(box.boxId);
+            Price price = new Price(box.sellPrice, box.exchangePrice, box.cashPrice);
+
             if (existingItem == null) {
                 Item newItem = new Item();
                 newItem.externalId = box.boxId;
                 newItem.name = box.boxName;
-                newItem.cashPrice = box.cashPrice;
-                newItem.exchangePrice = box.exchangePrice;
-                newItem.sellPrice = box.sellPrice;
                 newItem.categoryId = box.categoryId;
+                newItem.addNewPrice(price);
+                price.persist();
                 newItem.persist();
 
                 createCount++;
             } else {
-                updateCount++;
+
+                if (existingItem.hasPriceChanged(price)) {
+                    price.persist();
+                    existingItem.addNewPrice(price);
+                    existingItem.persist();
+                    updateCount++;
+                } else {
+                    sameCount++;
+                }
+
             }
 
         }
-        return "Created: " + createCount + ", Updated: " + updateCount;
+        return "Created: " + createCount + ", Price Updated: " + updateCount + ", Kept same: " + sameCount;
     }
 
     @GET
