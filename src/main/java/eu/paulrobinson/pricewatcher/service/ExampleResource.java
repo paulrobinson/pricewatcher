@@ -1,4 +1,4 @@
-package eu.paulrobinson.pricewatcher;
+package eu.paulrobinson.pricewatcher.service;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
