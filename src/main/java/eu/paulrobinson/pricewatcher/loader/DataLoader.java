@@ -12,7 +12,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import java.util.Collection;
 
-@Path("/load")
+@Path("/loader")
 public class DataLoader {
 
     @Inject
@@ -24,40 +24,44 @@ public class DataLoader {
     @Produces(MediaType.APPLICATION_JSON)
     @Transactional
     public String load() {
-        Collection<Boxes.Response.Data.Box> boxes =  cexService.getBoxes("[1064]", 1, 5).getBoxes();
+
 
         int updateCount = 0;
         int createCount = 0;
         int sameCount = 0;
 
-        for (Boxes.Response.Data.Box box : boxes) {
+        try {
+            Collection<Boxes.Response.Data.Box> boxes =  cexService.getBoxes("[1064]", 1, 5, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36").getBoxes();
 
-            Item existingItem = Item.findByExternalId(box.boxId);
-            Price price = new Price(box.sellPrice, box.exchangePrice, box.cashPrice);
+            for (Boxes.Response.Data.Box box : boxes) {
 
-            if (existingItem == null) {
-                Item newItem = new Item();
-                newItem.externalId = box.boxId;
-                newItem.name = box.boxName;
-                newItem.categoryId = box.categoryId;
-                newItem.addNewPrice(price);
-                price.persist();
-                newItem.persist();
+                Item existingItem = Item.findByExternalId(box.boxId);
+                Price price = new Price(box.sellPrice, box.exchangePrice, box.cashPrice);
 
-                createCount++;
-            } else {
-
-                if (existingItem.hasPriceChanged(price)) {
+                if (existingItem == null) {
+                    Item newItem = new Item(box.boxId, box.boxName, box.categoryId);
+                    newItem.addNewPrice(price);
                     price.persist();
-                    existingItem.addNewPrice(price);
-                    existingItem.persist();
-                    updateCount++;
+                    newItem.persist();
+
+                    createCount++;
                 } else {
-                    sameCount++;
+
+                    if (existingItem.hasPriceChanged(price)) {
+                        price.persist();
+                        existingItem.addNewPrice(price);
+                        existingItem.persist();
+                        updateCount++;
+                    } else {
+                        sameCount++;
+                    }
+
                 }
 
             }
-
+        } catch (javax.ws.rs.WebApplicationException e) {
+            System.out.println(e.getResponse().getHeaders());
+            e.printStackTrace();
         }
         return "Created: " + createCount + ", Price Updated: " + updateCount + ", Kept same: " + sameCount;
     }

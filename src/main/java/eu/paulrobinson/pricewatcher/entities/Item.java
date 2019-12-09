@@ -18,12 +18,17 @@ public class Item extends PanacheEntity {
         @OneToMany(fetch=FetchType.EAGER)
         public List<Price> prices = new ArrayList<>();
 
-        public static Item findByExternalId(String externalId) {
-                return find("externalId", externalId).firstResult();
+        public Item(String externalId, String name, String categoryId) {
+                this.externalId = externalId;
+                this.name = name;
+                this.categoryId = categoryId;
         }
 
-        public Price getCurrentPrice() {
-                return prices.get(0);
+        public Item() {
+        }
+
+        public static Item findByExternalId(String externalId) {
+                return find("externalId", externalId).firstResult();
         }
 
         public void addNewPrice(Price price) {
@@ -31,9 +36,17 @@ public class Item extends PanacheEntity {
         }
 
         public boolean hasPriceChanged(Price price) {
-                return (!price.sellPrice.equals(getCurrentPrice().sellPrice) || !price.exchangePrice.equals(getCurrentPrice().exchangePrice) || !price.cashPrice.equals(getCurrentPrice().cashPrice));
+                return (!price.sellPrice.equals(getLatestPrice().sellPrice) || !price.exchangePrice.equals(getLatestPrice().exchangePrice) || !price.cashPrice.equals(getLatestPrice().cashPrice));
 
         }
 
-
+        public Price getLatestPrice() {
+                Price latestPrice = prices.get(0);
+                for (Price p : prices) {
+                        if (p.date.after(latestPrice.date)) {
+                                latestPrice = p;
+                        }
+                }
+                return latestPrice;
+        }
 }
