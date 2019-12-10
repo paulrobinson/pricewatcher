@@ -2,8 +2,11 @@ package eu.paulrobinson.pricewatcher.loader;
 
 import eu.paulrobinson.pricewatcher.entities.Item;
 import eu.paulrobinson.pricewatcher.entities.Price;
+import io.quarkus.scheduler.Scheduled;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
+import org.jboss.logging.Logger;
 
+import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.transaction.Transactional;
 import javax.ws.rs.GET;
@@ -13,12 +16,14 @@ import javax.ws.rs.core.MediaType;
 import java.util.Collection;
 
 @Path("/loader")
+@ApplicationScoped
 public class DataLoader {
 
     private static final int RESULTS_PER_PAGE = 50;
     private static final long DELAY_BETWEEN_REQUESTS_MS = 200;
     private static final int[] CATAGORY_IDS = {1064, 1003};
 
+    private static final Logger LOGGER = Logger.getLogger(DataLoader.class.getName());
 
     @Inject
     @RestClient
@@ -28,22 +33,25 @@ public class DataLoader {
     @Path("/load")
     @Produces(MediaType.APPLICATION_JSON)
     @Transactional
-    public String load() {
+    @Scheduled(cron = "{cron.load.schedule}")
+    public void load() throws DataLoadException {
 
         DataLoadResult dataLoadResult = new DataLoadResult();
         for (int categoryId : CATAGORY_IDS) {
             loadCatagoryData(categoryId, dataLoadResult);
         }
-        return "Created: " + dataLoadResult.createCount + ", Price Updated: " + dataLoadResult.updateCount + ", Kept same: " + dataLoadResult.sameCount;
+        LOGGER.info("Created: " + dataLoadResult.createCount + ", Price Updated: " + dataLoadResult.updateCount + ", Kept same: " + dataLoadResult.sameCount);
     }
 
-    private void loadCatagoryData(int catagoryID, DataLoadResult dataLoadResult) {
+    private void loadCatagoryData(int catagoryID, DataLoadResult dataLoadResult) throws DataLoadException {
         try {
-            System.out.println("Loading Category: " + catagoryID);
+            LOGGER.info("Loading Category: " + catagoryID);
+
             int pageNumber = 0;
             while (true) {
                 int firstRecord = pageNumber * RESULTS_PER_PAGE + 1;
-                System.out.println("Getting page: " + pageNumber);
+                LOGGER.debug("Getting page: " + pageNumber);
+
                 Boxes boxesResult = cexService.getBoxes("[" + catagoryID +"]", firstRecord, RESULTS_PER_PAGE, CEXService.SORT_BY_RELEVANCE, CEXService.SORT_ORDER_DESC, CEXService.USER_AGENT);
                 if (boxesResult.isEmpty()) {
                     break;
@@ -79,19 +87,13 @@ public class DataLoader {
             }
 
         } catch (javax.ws.rs.WebApplicationException e) {
-            System.out.println(e.getResponse().getHeaders());
-            e.printStackTrace();
+            String message = "Error accessing CEX service. Response status code: " + e.getResponse().getStatus();
+            LOGGER.error(message);
+            LOGGER.error(e.getResponse().getHeaders());
+            throw new DataLoadException(message, e);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            throw new DataLoadException("Thread interupted when loading data from CEX", e);
         }
-    }
-
-    @GET
-    @Path("/list")
-    @Produces(MediaType.APPLICATION_JSON)
-    @Transactional
-    public Collection<Item> list() {
-        return Item.listAll();
     }
 
 }
