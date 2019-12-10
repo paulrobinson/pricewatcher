@@ -1,6 +1,7 @@
 package eu.paulrobinson.pricewatcher.entities;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntity;
+import io.quarkus.panache.common.Sort;
 
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
@@ -29,6 +30,11 @@ public class Item extends PanacheEntity {
 
         public static Item findByExternalId(String externalId) {
                 return find("externalId", externalId).firstResult();
+        }
+
+        public static List<Item> findByName(String name) {
+
+                return list("name LIKE ?1", Sort.by("name"),"%"+name+"%");
         }
 
         public void addNewPrice(Price price) {
