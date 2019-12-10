@@ -35,4 +35,8 @@ public class Boxes {
         return response.data.boxes;
     }
 
+    public boolean isEmpty() {
+        return response.data == null;
+    }
+
 }
